@@ -2,15 +2,22 @@ import streamlit as st
 from streamlit_lottie import st_lottie
 import requests
 
+# Load Lottie animation from URL with error handling
 def load_lottieurl(url):
-    r = requests.get(url)
-    if r.status_code != 200:
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            st.warning(f"Lottie animation load failed. Status code: {r.status_code}")
+            return None
+        return r.json()
+    except Exception as e:
+        st.error(f"Error loading Lottie animation: {e}")
         return None
-    return r.json()
 
+# Page config
 st.set_page_config(page_title="Dheer Doshi | Resume", page_icon="📄", layout="wide")
 
-# Custom CSS
+# Inject CSS
 with open("style.css") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
@@ -24,14 +31,17 @@ with st.sidebar:
     st.write("🔗 [LinkedIn](https://www.linkedin.com)")
     st.write("🐙 [GitHub](https://www.github.com)")
 
-# Load animation
-lottie_resume = load_lottieurl("https://assets2.lottiefiles.com/packages/lf20_cg8ksmnp.json")
+# Load Lottie animation (safe fallback)
+lottie_resume = load_lottieurl("https://assets2.lottiefiles.com/packages/lf20_q5pk6p1k.json")
 
 # Intro
 st.title("👋 Hi, I'm Dheer Doshi")
 st.subheader("Aspiring Data Scientist | Developer | Community Builder")
 
-st_lottie(lottie_resume, height=300, key="resume")
+if lottie_resume:
+    st_lottie(lottie_resume, height=300, key="resume")
+else:
+    st.info("✨ Interactive animation couldn't be loaded. But here's my resume ↓")
 
 # Experience
 st.markdown("## 💼 Experience")
@@ -56,14 +66,14 @@ st.write("""
 - PIT-UN: Managed national tech convening logistics.
 """)
 
-# Projects / Activities
+# Projects / Leadership
 st.markdown("## 🚀 Projects & Leadership")
 st.write("""
-- **TEDx Singhania**: Director – Top-tier speaker lineup & record digital reach.  
-- **Model UN**: Directed 2000+ delegates using digital tools.  
-- **IRIS Magazine**: Editor in Chief – Launched digital edition & global partnerships.  
-- **Jupiter Hospital**: Mental health volunteer & inter-hospital outreach.  
-- **Concinnity 21**: Head of Technical – $30,000 raised for pediatric cancer.
+- **TEDx Singhania**: Director – Curated speaker lineup & led record digital reach.  
+- **Model UN**: Directed 2000+ delegates using digital tooling.  
+- **IRIS Magazine**: Editor in Chief – Launched digital edition & global collabs.  
+- **Jupiter Hospital**: Mental health volunteer, inter-hospital campaigns.  
+- **Concinnity 21**: Head of Technical – $30K raised for pediatric cancer patients.
 """)
 
 # Skills
@@ -74,6 +84,9 @@ st.write("""
 **Languages**: English, Hindi, Marathi, Gujarati, Spanish (Elementary)
 """)
 
-# Download Resume
-with open("assets/Dheer Doshi Resume.pdf", "rb") as f:
-    st.download_button("📥 Download PDF Resume", f, file_name="Dheer_Doshi_Resume.pdf", mime="application/pdf")
+# Resume Download
+try:
+    with open("assets/Dheer_Doshi_Resume.pdf", "rb") as f:
+        st.download_button("📥 Download PDF Resume", f, file_name="Dheer_Doshi_Resume.pdf", mime="application/pdf")
+except FileNotFoundError:
+    st.warning("Resume PDF not found. Please add it to assets/ as Dheer_Doshi_Resume.pdf")
