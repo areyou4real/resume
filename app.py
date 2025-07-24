@@ -5,7 +5,8 @@ import requests
 # Load Lottie animation from URL with error handling
 def load_lottieurl(url):
     try:
-        r = requests.get(url)
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers)
         if r.status_code != 200:
             st.warning(f"Lottie animation load failed. Status code: {r.status_code}")
             return None
@@ -13,6 +14,7 @@ def load_lottieurl(url):
     except Exception as e:
         st.error(f"Error loading Lottie animation: {e}")
         return None
+
 
 # Page config
 st.set_page_config(page_title="Dheer Doshi | Resume", page_icon="📄", layout="wide")
