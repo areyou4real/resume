@@ -16,7 +16,7 @@ with open("style.css") as f:
 
 # Sidebar
 with st.sidebar:
-    st.image("assets/profile.jpg", width=150)
+    st.image("assets/profile.JPG", width=150)
     st.title("Dheer Doshi")
     st.write("📍 Boston, MA / Mumbai, India")
     st.write("📧 dheer@bu.edu")
