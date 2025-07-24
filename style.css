@@ -1,0 +1,35 @@
+/* Set the background and font */
+body {
+    background-color: #f7f9fc;
+    font-family: 'Segoe UI', sans-serif;
+    color: #333;
+}
+
+/* Headings */
+h1, h2, h3 {
+    color: #1a73e8;
+}
+
+/* Sidebar styling */
+section[data-testid="stSidebar"] {
+    background-color: #ffffff;
+    padding: 1rem;
+}
+
+/* Make resume sections more distinct */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+/* Customize download button */
+button[data-testid="baseButton-primary"] {
+    background-color: #1a73e8;
+    color: #fff;
+    border-radius: 0.5rem;
+    font-weight: 600;
+}
+
+button[data-testid="baseButton-primary"]:hover {
+    background-color: #155ab6;
+}
