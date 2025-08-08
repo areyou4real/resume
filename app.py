@@ -1,6 +1,7 @@
 import streamlit as st
 from pathlib import Path
 import base64
+import streamlit.components.v1 as components
 
 # -----------------------------
 # Page Config (Light-first)
@@ -121,11 +122,16 @@ html, body, [class*="css"] {
 .section { scroll-margin-top: 90px; }
 hr { border:none; border-top:1px solid var(--border); margin: 8px 0 16px 0; }
 </style>
-
 <div id="scroll-progress"></div>
+""", unsafe_allow_html=True)
+
+# Inject the JS with components.html (so it actually runs)
+components.html("""
 <script>
 (function(){
-  const progress = document.getElementById('scroll-progress');
+  const progress = document.getElementById('scroll-progress') || (function(){
+    const p = document.createElement('div'); p.id='scroll-progress'; document.body.appendChild(p); return p;
+  })();
   const backBtn = document.createElement('button');
   backBtn.id = 'backToTop';
   backBtn.innerText = '↑';
@@ -145,10 +151,9 @@ hr { border:none; border-top:1px solid var(--border); margin: 8px 0 16px 0; }
     entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } });
   }, {threshold: 0.08});
   setTimeout(()=>{ document.querySelectorAll('.reveal').forEach(el=>obs.observe(el)); }, 100);
-
 })();
 </script>
-""", unsafe_allow_html=True)
+""", height=0)
 
 # -----------------------------
 # Data (edit to personalize)
@@ -264,10 +269,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# Hero
+# Hero + About
 # -----------------------------
 st.markdown(f"""
-<div class="hero reveal" id="about">
+<div class="hero reveal section" id="about">
   <h1>{PROFILE['name']}</h1>
   <div class="sub">{PROFILE['role']}</div>
   <div class="meta">📍 {PROFILE['location']}</div>
@@ -277,33 +282,31 @@ st.markdown(f"""
     {"".join([f'<a class="chip" href="{url}" target="_blank">🔗 {name}</a>' for name, url in PROFILE["links"].items()])}
   </div>
 </div>
-""", unsafe_allow_html=True)
-
-st.markdown("""<div class="reveal" style="margin-top:6px;"><div class="card">
+<div class="reveal" style="margin-top:6px;"><div class="card">
   <div class="section-title">About</div>
   <div class="muted">Data science student blending research rigor with product sense. Comfortable across ML pipelines, deployment, and high-clarity communication. I enjoy building tools that make complex ideas usable for people.</div>
-</div></div>""", unsafe_allow_html=True)
+</div></div>
+""", unsafe_allow_html=True)
 
 # -----------------------------
 # Experience
 # -----------------------------
 st.markdown("<div id='experience' class='section'></div>", unsafe_allow_html=True)
-st.markdown("<div class='reveal'><div class='card'><div class='section-title'>Experience</div></div></div>", unsafe_allow_html=True)
+st.markdown("<div class='reveal card'><div class='section-title'>Experience</div></div>", unsafe_allow_html=True)
 for exp in EXPERIENCE:
-    with st.container():
-        st.markdown(f"""
-        <div class="reveal card" style="margin-top:10px;">
-            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-                <div><strong>{exp['title']}</strong> — {exp['company']}</div>
-                <div class="muted">{exp['start']} – {exp['end']} • {exp['location']}</div>
-            </div>
-            <div style="margin:8px 0 4px 0;">{tag_badges(exp.get('tags'))}</div>
-            <ul style="margin:6px 0 0 18px;">
-              {''.join([f'<li>{b}</li>' for b in exp['bullets']])}
-            </ul>
-            <div style="margin-top:10px;">{"".join([f"<span class='kpi'>{k}</span>" for k in exp.get("kpis", [])])}</div>
+    st.markdown(f"""
+    <div class="reveal card" style="margin-top:10px;">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+            <div><strong>{exp['title']}</strong> — {exp['company']}</div>
+            <div class="muted">{exp['start']} – {exp['end']} • {exp['location']}</div>
         </div>
-        """, unsafe_allow_html=True)
+        <div style="margin:8px 0 4px 0;">{tag_badges(exp.get('tags'))}</div>
+        <ul style="margin:6px 0 0 18px;">
+          {''.join([f'<li>{b}</li>' for b in exp['bullets']])}
+        </ul>
+        <div style="margin-top:10px;">{"".join([f"<span class='kpi'>{k}</span>" for k in exp.get("kpis", [])])}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 # -----------------------------
 # Education
@@ -323,7 +326,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # Projects (search + tags)
 # -----------------------------
 st.markdown("<div id='projects' class='section'></div>", unsafe_allow_html=True)
-left, right = st.columns([2,1], vertical_alignment="top")
+left, right = st.columns([2,1])  # removed vertical_alignment for compatibility
 with right:
     all_tags = sorted({t for p in PROJECTS for t in p["tags"]})
     sel = st.multiselect("🔎 Filter by tags", options=all_tags, placeholder="Select tags...")
@@ -356,7 +359,6 @@ with left:
 st.markdown("<div id='skills' class='section'></div>", unsafe_allow_html=True)
 st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Skills Matrix</div>", unsafe_allow_html=True)
 
-# Try st.pills if available; fallback to multiselect
 all_skills = [s for grp in SKILLS.values() for s in grp]
 if hasattr(st, "pills"):
     selected = st.pills("Highlight", options=all_skills, selection_mode="multi")
@@ -368,13 +370,13 @@ groups = list(SKILLS.items())
 for i, (grp, items) in enumerate(groups):
     with (c1 if i % 2 == 0 else c2):
         st.markdown(f"<div class='section-title' style='margin-top:6px;'>{grp}</div>", unsafe_allow_html=True)
-        figs = []
+        chips = []
         for s in items:
             if selected and s in selected:
-                figs.append(f"<span class='badge' style='box-shadow:0 0 0 2px #bae6fd inset'>{s}</span>")
+                chips.append(f"<span class='badge' style='box-shadow:0 0 0 2px #bae6fd inset'>{s}</span>")
             else:
-                figs.append(f"<span class='badge'>{s}</span>")
-        st.markdown(" ".join(figs), unsafe_allow_html=True)
+                chips.append(f"<span class='badge'>{s}</span>")
+        st.markdown(" ".join(chips), unsafe_allow_html=True)
 
 st.markdown("""
 <hr/>
@@ -398,6 +400,13 @@ st.markdown("</div>", unsafe_allow_html=True)
 # -----------------------------
 st.markdown("<div id='resume' class='section'></div>", unsafe_allow_html=True)
 st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Resume</div>", unsafe_allow_html=True)
+
+def download_button_from_file(file_path: Path, label: str):
+    try:
+        bytes_data = file_path.read_bytes()
+        st.download_button(label, data=bytes_data, file_name=file_path.name, mime="application/pdf", use_container_width=True)
+    except Exception:
+        st.info("Resume not bundled yet. Add your PDF to ./assets/resume.pdf")
 
 pdf_path = Path(__file__).parent / "assets" / "resume.pdf"
 st.write("Download a copy of my resume:")
