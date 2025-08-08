@@ -1,442 +1,621 @@
 import streamlit as st
-from pathlib import Path
-import base64
 import streamlit.components.v1 as components
+from pathlib import Path
+from io import BytesIO
+import base64, json, datetime as dt
 
-# -----------------------------
-# Page Config (Light-first)
-# -----------------------------
+# =========================
+# Page & Global Config
+# =========================
 st.set_page_config(
-    page_title="Dheer Doshi — Interactive Resume",
+    page_title="Killer Resume — Dheer Doshi",
     page_icon="💼",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -----------------------------
-# Global CSS + Animations + Scroll UX
-# -----------------------------
-st.markdown("""
-<style>
-/* Light theme tokens */
-:root{
-  --bg:#ffffff;
-  --text:#0b1220;
-  --muted:#475569;
-  --card:#f7fafc;
-  --border:rgba(2,6,23,0.08);
-  --accent:#0ea5e9;
-  --accent-soft:#e0f2fe;
-  --chip-bg:#eef6ff;
-  --chip-br:#bfe0ff;
-}
+# --- Helpers for Streamlit compat ---
+def get_query_params():
+    try:
+        return st.query_params  # Streamlit >= 1.33
+    except Exception:
+        return st.experimental_get_query_params()
 
-/* Base */
-html, body, [class*="css"] {
+def set_query_params(**kwargs):
+    try:
+        st.query_params.update(kwargs)  # Streamlit >= 1.33
+    except Exception:
+        st.experimental_set_query_params(**kwargs)
+
+# =========================
+# THEMES / A11y TOGGLES
+# =========================
+with st.sidebar:
+    st.subheader("Display")
+    theme_choice = st.selectbox("Theme", ["Sleek Blue (Light)", "Teal/Purple (Light)", "Dark"], index=0)
+    high_contrast = st.checkbox("High contrast", value=False)
+    reduce_motion = st.checkbox("Reduce motion", value=False)
+    st.divider()
+    st.subheader("Mode & Role")
+    mode = st.toggle("Scan Mode (TL;DR)", value=True)
+    role_choice = st.radio("Role focus", ["Data Science", "Product", "Design"], horizontal=False)
+    st.divider()
+    st.subheader("Utilities")
+    if st.button("Open Print Dialog (PDF)"):
+        components.html("<script>window.print()</script>", height=0)
+
+# =========================
+# CSS (Design System)
+# =========================
+tokens = {
+    "Sleek Blue (Light)": {
+        "--bg":"#f6f7fb","--surface":"#ffffff","--text":"#0f172a","--muted":"#64748b",
+        "--primary":"#2563eb","--accent":"#0ea5e9","--success":"#16a34a","--warn":"#f59e0b",
+        "--ring":"rgba(14,165,233,.35)","--border":"rgba(2,6,23,.08)"
+    },
+    "Teal/Purple (Light)": {
+        "--bg":"#f7fbfb","--surface":"#ffffff","--text":"#111827","--muted":"#64748b",
+        "--primary":"#06b6d4","--accent":"#7c3aed","--success":"#16a34a","--warn":"#f59e0b",
+        "--ring":"rgba(14,165,233,.35)","--border":"rgba(2,6,23,.08)"
+    },
+    "Dark": {
+        "--bg":"#0b1020","--surface":"#11162a","--text":"#e6e9f2","--muted":"#a3acc3",
+        "--primary":"#06b6d4","--accent":"#7c3aed","--success":"#22c55e","--warn":"#f59e0b",
+        "--ring":"rgba(14,165,233,.45)","--border":"rgba(226,233,242,.12)"
+    }
+}[theme_choice]
+
+if high_contrast:
+    tokens["--text"] = "#000" if theme_choice != "Dark" else "#fff"
+    tokens["--muted"] = "#111" if theme_choice != "Dark" else "#eee"
+    tokens["--border"] = "rgba(0,0,0,.3)" if theme_choice != "Dark" else "rgba(255,255,255,.35)"
+
+motion_css = "0s" if reduce_motion else ".25s"
+
+st.markdown(f"""
+<style>
+:root {{
+  --bg:{tokens['--bg']};
+  --surface:{tokens['--surface']};
+  --text:{tokens['--text']};
+  --muted:{tokens['--muted']};
+  --primary:{tokens['--primary']};
+  --accent:{tokens['--accent']};
+  --success:{tokens['--success']};
+  --warn:{tokens['--warn']};
+  --ring:{tokens['--ring']};
+  --border:{tokens['--border']};
+  --shadow-1: 0 1px 2px rgba(0,0,0,.06);
+  --shadow-2: 0 10px 30px rgba(0,0,0,.10);
+}}
+html, body, [class*="css"] {{
   background: var(--bg) !important;
   color: var(--text) !important;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   scroll-behavior:smooth;
-}
-
-/* Scroll progress bar */
-#scroll-progress {
-  position: fixed; top: 0; left: 0; height: 4px; width: 0%;
-  background: linear-gradient(90deg, #22c55e, #0ea5e9, #a855f7);
-  z-index: 10000; border-radius:0 4px 4px 0;
-}
-
-/* Top Nav */
-.navbar {
+}}
+/* Sticky header + toc */
+.navbar {{
   position: sticky; top: 0; z-index: 9999;
   backdrop-filter: saturate(1.2) blur(10px);
-  background: rgba(255,255,255,0.75);
+  background: color-mix(in oklab, var(--surface) 82%, transparent);
   border-bottom:1px solid var(--border);
-  padding: 10px 8px; border-radius: 0 0 12px 12px;
-}
-.nav-grid { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; }
-.nav-links { display:flex; gap:10px; flex-wrap:wrap; }
-.nav-btn {
-  border:1px solid var(--border); background:#fff; color:var(--text);
-  padding:8px 12px; border-radius:10px; font-weight:600; text-decoration:none; transition: all .2s ease;
-}
-.nav-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(2,6,23,0.08); border-color:#bae6fd; }
+  padding: 8px 10px; border-radius: 0 0 12px 12px;
+}}
+.nav-grid {{ display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; max-width: 1200px; margin: 0 auto; }}
+.nav-links {{ display:flex; gap:8px; flex-wrap:wrap; }}
+.nav-btn {{
+  border:1px solid var(--border); background:var(--surface); color:var(--text);
+  padding:8px 12px; border-radius:999px; font-weight:600; text-decoration:none;
+  transition: transform {motion_css} ease, box-shadow {motion_css} ease, border-color {motion_css} ease;
+  position:relative;
+}}
+.nav-btn[aria-current="page"] {{ border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }}
+.nav-btn:hover {{ transform: translateY(-1px); box-shadow: var(--shadow-2); }}
+
+/* Sections + cards */
+.section {{ scroll-margin-top: 90px; max-width: 1200px; margin: 0 auto; padding: 8px 12px; }}
+.card {{ background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:16px 18px; box-shadow: var(--shadow-1); }}
+.section-title {{ font-weight:800; font-size:clamp(1.2rem, 1vw + 1rem, 1.6rem); letter-spacing:.2px; margin:0 0 8px 0; }}
+.muted {{ color: var(--muted); }}
 
 /* Hero */
-.hero {
-  padding: 28px 24px; margin: 8px 0 16px 0;
-  border-radius: 20px; position: relative; overflow:hidden;
-  background: radial-gradient(1200px 600px at 5% -10%, #e7f7ff 0%, transparent 50%), 
-              radial-gradient(900px 500px at 95% 10%, #f6e8ff 0%, transparent 55%),
-              var(--card);
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 30px rgba(2,6,23,0.06);
-  animation: floatIn .6s ease-out both;
+.hero {{
+  margin: 10px auto 16px auto; padding: 26px 22px; border-radius: 20px;
+  background: radial-gradient(1200px 600px at 12% -10%, color-mix(in oklab, var(--accent) 16%, transparent) 0%, transparent 50%),
+              radial-gradient(900px 500px at 95% 10%, color-mix(in oklab, var(--primary) 14%, transparent) 0%, transparent 55%),
+              var(--surface);
+  border: 1px solid var(--border); box-shadow: var(--shadow-2);
+  animation: fadeUp {motion_css} ease forwards;
+  max-width: 1200px;
 }
-@keyframes floatIn { from {opacity:0; transform: translateY(10px)} to {opacity:1; transform: translateY(0)} }
+@keyframes fadeUp {{ from {{opacity:.0; transform: translateY(8px)}} to {{opacity:1; transform: translateY(0)}} }}
+.hero h1 {{ font-family: "Space Grotesk", Inter, ui-sans-serif; font-size:clamp(2rem, 2.5vw + 1rem, 3rem); margin:0 0 6px 0; line-height:1.1; }}
+.badge {{
+  display:inline-block; padding:6px 12px; border-radius:999px; margin:0 8px 8px 0;
+  background: color-mix(in oklab, var(--primary) 8%, var(--surface));
+  border:1px solid color-mix(in oklab, var(--primary) 25%, var(--border));
+  font-weight:600; font-size:.9rem;
+}}
+.kpi {{ display:inline-block; padding:6px 10px; border-radius:10px; border:1px dashed var(--border); margin:0 10px 10px 0; }}
 
-.hero h1 { font-size:2.15rem; margin:0 0 6px 0; line-height:1.1; }
-.hero .sub { color: var(--muted); margin-bottom:10px; }
-.hero .meta { color: var(--muted); }
+/* Grid & cards */
+.grid {{
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(12, 1fr);
+}}
+.col-8 {{ grid-column: span 8; }}
+.col-4 {{ grid-column: span 4; }}
+@media (max-width: 900px) {{
+  .col-8, .col-4 {{ grid-column: 1 / -1; }}
+}}
 
-/* Chips */
-.chip {
-  display:inline-flex; align-items:center; gap:8px;
-  padding:6px 12px; margin:6px 6px 0 0; border-radius:999px;
-  background: var(--chip-bg); border:1px solid var(--chip-br);
-  font-size:0.92rem; text-decoration:none; color:var(--text);
-  transition: transform .18s ease, box-shadow .18s ease;
-}
-.chip:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(2,6,23,0.08); }
+/* Project cards */
+.proj-card {{ transition: transform {motion_css} ease, box-shadow {motion_css} ease; }}
+.proj-card:hover {{ transform: translateY(-2px); box-shadow: var(--shadow-2); }}
 
-/* Cards */
-.card {
-  background:#fff; border:1px solid var(--border); border-radius:18px;
-  padding:16px 18px; box-shadow: 0 10px 24px rgba(2,6,23,0.05);
-}
-.section-title { font-weight:800; font-size:1.1rem; letter-spacing:.2px; margin:0 0 8px 0; }
-.muted { color: var(--muted); }
+/* Progress meters */
+.meter-wrap {{ height:8px; background: color-mix(in oklab, var(--muted) 18%, transparent); border-radius:24px; overflow:hidden; border:1px solid var(--border); }}
+.meter-val {{ height:100%; background: var(--primary); width:0; transition: width 0.8s ease; }}
 
-/* Badges / KPIs */
-.badge {
-  display:inline-block; padding:5px 10px; border-radius:999px;
-  background: var(--accent-soft); color:#075985; font-weight:600; font-size:.82rem;
-  margin:0 8px 8px 0; border:1px solid #bae6fd;
-}
-.kpi { display:inline-block; padding:6px 10px; border-radius:10px; border:1px dashed #cbd5e1; margin:0 10px 10px 0; }
+/* Testimonials carousel */
+.carousel {{ position:relative; overflow:hidden; border-radius:16px; border:1px solid var(--border); background:var(--surface); }}
+.carousel-track {{ display:flex; transition: transform {motion_css} ease; }}
+.carousel-item {{ min-width:100%; padding: 18px; box-sizing: border-box; }}
+.carousel-controls {{ display:flex; gap:10px; position:absolute; right:10px; bottom:10px; }}
+.carousel button {{ border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:6px 10px; }}
+@media (prefers-reduced-motion) {{
+  .carousel-track {{ transition:none !important; }}
+}}
 
-/* Reveal on scroll */
-.reveal { opacity:0; transform: translateY(12px); transition: all .6s ease; }
-.reveal.visible { opacity:1; transform: translateY(0); }
+/* Floating CTA */
+.floating-cta {{
+  position: fixed; right: 16px; bottom: 18px; z-index: 9998;
+  display:flex; gap:8px; flex-wrap:wrap;
+}}
+.floating-cta a {{
+  text-decoration:none; padding:10px 12px; border-radius:999px; font-weight:700;
+  background: var(--primary); color: #fff;
+}}
+@media (max-width: 700px) {{
+  .floating-cta {{ position: fixed; left:0; right:0; bottom:0; justify-content:center; background:var(--surface); padding:10px; border-top:1px solid var(--border); }}
+}}
 
-/* Floating Back-To-Top */
-#backToTop {
-  position: fixed; right: 18px; bottom: 24px; z-index: 9999;
-  border: none; background: #111827; color: #fff; border-radius: 999px;
-  padding: 12px 14px; cursor: pointer; box-shadow: 0 8px 24px rgba(17,24,39,.25);
-  display:none; transition: transform .2s ease, opacity .2s ease;
-}
-#backToTop:hover { transform: translateY(-2px); }
+/* Focus rings */
+a:focus-visible, button:focus-visible {{ box-shadow: 0 0 0 4px var(--ring); outline: none; }}
 
-/* Section anchor spacing */
-.section { scroll-margin-top: 90px; }
-hr { border:none; border-top:1px solid var(--border); margin: 8px 0 16px 0; }
+hr {{ border:none; border-top:1px solid var(--border); margin: 8px 0 16px 0; }}
 </style>
-<div id="scroll-progress"></div>
 """, unsafe_allow_html=True)
 
-# Inject the JS with components.html (so it actually runs)
-components.html("""
-<script>
-(function(){
-  const progress = document.getElementById('scroll-progress') || (function(){
-    const p = document.createElement('div'); p.id='scroll-progress'; document.body.appendChild(p); return p;
-  })();
-  const backBtn = document.createElement('button');
-  backBtn.id = 'backToTop';
-  backBtn.innerText = '↑';
-  document.body.appendChild(backBtn);
-
-  function onScroll(){
-    const h = document.documentElement;
-    const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
-    progress.style.width = scrolled + '%';
-    backBtn.style.display = h.scrollTop > 300 ? 'block' : 'none';
-  }
-  window.addEventListener('scroll', onScroll, {passive:true});
-  backBtn.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
-
-  // Reveal on scroll
-  const obs = new IntersectionObserver((entries)=>{
-    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } });
-  }, {threshold: 0.08});
-  setTimeout(()=>{ document.querySelectorAll('.reveal').forEach(el=>obs.observe(el)); }, 100);
-})();
-</script>
-""", height=0)
-
-# -----------------------------
-# Data (edit to personalize)
-# -----------------------------
-PROFILE = {
-    "name": "Dheer Doshi",
-    "role": "Data Science @ Boston University • Research & Product-minded",
-    "location": "Boston, MA • Open to remote/hybrid",
-    "email": "dheer@bu.edu",
-    "phone": "(857) 565 6018",
-    "links": {
-        "LinkedIn": "https://www.linkedin.com/",
-        "GitHub": "https://github.com/",
-        "Portfolio": "https://example.com/"
-    }
-}
-
-EXPERIENCE = [
+# =========================
+# Placeholders / Content
+# =========================
+ROLES = [
     {
-        "company": "Ventura Securities",
-        "location": "Mumbai, India",
-        "title": "Senior Research Intern",
-        "start": "Dec 2024",
-        "end": "Present",
-        "bullets": [
-            "Delivered equity & macro research informing portfolio strategy and executive decisions.",
-            "Synthesized complex market data into investor-facing insights & thought leadership.",
-            "Built financial models to forecast earnings, assess risk, and source opportunities."
+        "id":"data-science","label":"Data Science",
+        "tldr":["Shipped ML pipelines","Cut inference cost 35%","+12.4% F1 on key task"],
+        "deep":[
+            "Built sequence model for mutations (+7.8% AUROC).",
+            "Productionized FastAPI + Docker + CI, 99.9% uptime.",
+            "Set up drift & latency monitoring; auto rollbacks."
         ],
-        "tags": ["Finance Research", "Modeling", "Macro", "Python"],
-        "kpis": ["Earnings models", "Risk frameworks", "Sector deep dives"]
+        "featured":["genomesage","smpbed"]
     },
-]
-
-EDUCATION = [
     {
-        "school": "Boston University",
-        "program": "BS in Data Science",
-        "gpa": "3.43",
-        "grad": "May 2027",
-        "highlights": [
-            "GenomeSage: sequence modeling in PyTorch to predict mutations; Tableau viz for interpretability.",
-            "SMPBED: Python/R models for S&P 500 trend forecasting using macro indicators; Tableau viz.",
-            "Disease Simulation (Rust): SIR model on synthetic graphs; centrality-based risk analysis.",
-            "Vision: Real-time image classification web app (TensorFlow, Streamlit, Docker).",
-            "GitOps & CI with GitHub; streamlined deployment across projects."
-        ]
+        "id":"product","label":"Product",
+        "tldr":["Roadmap via metrics","+18% activation","A/B infra at scale"],
+        "deep":[
+            "Drove outcome-focused specs; clarified PRDs w/ data.",
+            "Launched experiments pipeline; uplift +18% activation.",
+            "Worked with eng/research to de-risk launches."
+        ],
+        "featured":["vision"]
+    },
+    {
+        "id":"design","label":"Design",
+        "tldr":["Systemized tokens","Accessible patterns","Proto in hours"],
+        "deep":[
+            "Built modern token-based system across apps.",
+            "Ran a11y audits; shipped WCAG 2.2 AA patterns.",
+            "Interactive prototypes informing product decisions."
+        ],
+        "featured":["vision","sir"]
     }
 ]
 
 PROJECTS = [
-    {"name": "GenomeSage", "summary": "Sequence modeling to predict genetic mutations; model explainability dashboards.", "tags": ["PyTorch", "Bioinformatics", "Tableau", "Data Viz"]},
-    {"name": "SMPBED", "summary": "Macroeconomic indicators → predictive models for S&P 500 trends.", "tags": ["Python", "R", "Finance", "Time Series"]},
-    {"name": "Disease Simulation", "summary": "Rust-based SIR simulations on synthetic graphs; centrality analysis for risk.", "tags": ["Rust", "Graphs", "Simulation"]},
-    {"name": "Vision Web App", "summary": "Real-time image classification with TensorFlow + Streamlit; Dockerized.", "tags": ["TensorFlow", "Streamlit", "Docker", "MLOps"]},
+    {
+        "id":"genomesage","title":"GenomeSage",
+        "summary":"Sequence modeling for mutation prediction.",
+        "par":[
+            {"type":"Problem","text":"Rare variants → low SNR"},
+            {"type":"Action","text":"BiLSTM/TCN + class-weighting, SHAP viz"},
+            {"type":"Result","text":"+7.8% AUROC; -19% FPs"}
+        ],
+        "metrics":[{"label":"AUROC","value":0.914},{"label":"Latency","value":62,"unit":"ms"}],
+        "tags":{"role":["data-science"],"stack":["PyTorch","Docker"],"industry":["Bio"],"year":2025,"impact":"High"},
+        "links":{"demo":"","repo":"","pdf":""},
+        "images":[]
+    },
+    {
+        "id":"smpbed","title":"SMPBED",
+        "summary":"Macro indicators → S&P trend forecasting.",
+        "par":[
+            {"type":"Problem","text":"Noisy macro → weak signals"},
+            {"type":"Action","text":"Feature store + ensembling"},
+            {"type":"Result","text":"+3.2% directional accuracy"}
+        ],
+        "metrics":[{"label":"Sharpe (sim)","value":1.2}],
+        "tags":{"role":["data-science","product"],"stack":["Python","R","Tableau"],"industry":["Finance"],"year":2025,"impact":"Medium"},
+        "links":{},
+        "images":[]
+    },
+    {
+        "id":"vision","title":"Vision Web App",
+        "summary":"Real-time classification; Dockerized Streamlit.",
+        "par":[
+            {"type":"Problem","text":"Manual triage too slow"},
+            {"type":"Action","text":"TensorFlow + GPU build, cache"},
+            {"type":"Result","text":"↓ latency 42%; ↑ throughput 2.1x"}
+        ],
+        "metrics":[{"label":"Latency","value":45,"unit":"ms"},{"label":"Throughput","value":2.1,"unit":"x"}],
+        "tags":{"role":["product","design"],"stack":["TensorFlow","Docker","Streamlit"],"industry":["Vision"],"year":2024,"impact":"High"},
+        "links":{},
+        "images":[]
+    },
+    {
+        "id":"sir","title":"SIR Simulator",
+        "summary":"Rust-based SIR on synthetic graphs.",
+        "par":[
+            {"type":"Problem","text":"Unclear outbreak dynamics"},
+            {"type":"Action","text":"Graph SIR + centrality analysis"},
+            {"type":"Result","text":"Better intervention targeting"}
+        ],
+        "metrics":[{"label":"Sim speed","value":5.3,"unit":"x"}],
+        "tags":{"role":["data-science"],"stack":["Rust","Graphs"],"industry":["Public Health"],"year":2024,"impact":"Medium"},
+        "links":{},
+        "images":[]
+    },
 ]
 
 SKILLS = {
-    "Core": ["Python", "PyTorch", "TensorFlow", "Rust", "R", "SQL", "GitHub", "Docker"],
-    "Data & Cloud": ["Tableau", "AWS", "Firebase", "MongoDB"],
-    "Apps & Video": ["Streamlit", "HTML5", "JavaScript", "OBS Studio", "Adobe Suite", "Final Cut Pro"],
-    "Other": ["CPR Certified"]
+    "Core":["Python","PyTorch","TensorFlow","Rust","R","SQL","Docker","GitHub"],
+    "Data/Cloud":["Tableau","AWS","MongoDB","Firebase"],
+    "Product/Design":["Streamlit","Figma","HTML/CSS/JS","Storybook"],
 }
+SKILL_LEVEL = {s: v for s, v in zip([*SKILLS["Core"],*SKILLS["Data/Cloud"],*SKILLS["Product/Design"]],[5,5,4,3,4,4,4,4, 4,3,3,3, 4,4,4,3])}
 
-LEADERSHIP = [
-    {"role": "Director, Oxford MUN", "impact": "Led 2,000+ delegate sessions; digital briefing innovations."},
-    {"role": "Director, TEDx Singhania", "impact": "Exceeded sponsorship targets; record virtual attendance."},
-    {"role": "Editor-in-Chief, IRIS Magazine", "impact": "Revamped with digital edition & global partnerships."},
-    {"role": "Head of Technical, Concinnity 21", "impact": "Live stream & AV ops for 1,000+ attendees; raised $30k."},
-    {"role": "PIT-UN Volunteer", "impact": "Orchestrated logistics enabling cross-sector collaboration."},
+TESTIMONIALS = [
+    {"quote":"Dheer turns ambiguous ideas into shippable systems.","name":"Jane Smith","role":"Head of Data","logo":""},
+    {"quote":"Strong product sense with solid ML engineering.","name":"Alex Lee","role":"PM, Vision","logo":""},
+    {"quote":"Fast iterations, clean delivery, thoughtful UX.","name":"Priya Kumar","role":"Design Lead","logo":""},
 ]
 
-LANGUAGES = ["English", "Hindi", "Marathi", "Gujarati", "Spanish (Elementary)"]
-INTERESTS = ["Debate", "History (Greek & Roman)", "Soccer", "Travel", "Event Planning"]
+RESUME_HISTORY = [
+    {"date":"2025-07-01","changes":["Added GenomeSage metrics","+ Updated GPA to 3.43"]},
+    {"date":"2025-08-05","changes":["New case study: Vision Web App","Refreshed skills meters"]},
+]
 
-# -----------------------------
-# Helpers
-# -----------------------------
-def tag_badges(tags):
-    if not tags: return ""
-    return " ".join([f"<span class='badge'>{t}</span>" for t in tags])
+STATS = {"years":3, "projects":18, "impact_pct":27}
 
-def mailto_link(to, subject, body):
-    import urllib.parse as ul
-    return f"mailto:{to}?subject={ul.quote(subject)}&body={ul.quote(body)}"
+CONTACT = {"email":"dheer@bu.edu","calendar":"https://calendly.com/"}
 
-def download_button_from_file(file_path: Path, label: str):
-    try:
-        bytes_data = file_path.read_bytes()
-        st.download_button(label, data=bytes_data, file_name=file_path.name, mime="application/pdf", use_container_width=True)
-    except Exception:
-        st.info("Resume not bundled yet. Add your PDF to ./assets/resume.pdf")
-
-# -----------------------------
-# Sticky Top Nav
-# -----------------------------
+# =========================
+# Sticky Header / TOC
+# =========================
 st.markdown("""
-<div class="navbar">
+<div class="navbar" role="navigation" aria-label="Sections">
   <div class="nav-grid">
-    <div><strong>💼 Dheer Doshi</strong></div>
-    <div class="nav-links">
-      <a class="nav-btn" href="#about">About</a>
-      <a class="nav-btn" href="#experience">Experience</a>
-      <a class="nav-btn" href="#education">Education</a>
-      <a class="nav-btn" href="#projects">Projects</a>
-      <a class="nav-btn" href="#skills">Skills</a>
-      <a class="nav-btn" href="#leadership">Leadership</a>
-      <a class="nav-btn" href="#resume">Resume</a>
-      <a class="nav-btn" href="#contact">Contact</a>
+    <a href="#top" class="nav-btn" aria-label="Home">💼 Dheer Doshi</a>
+    <div class="nav-links" id="toc">
+      <a class="nav-btn" href="#about" data-section="about">About</a>
+      <a class="nav-btn" href="#experience" data-section="experience">Experience</a>
+      <a class="nav-btn" href="#projects" data-section="projects">Projects</a>
+      <a class="nav-btn" href="#skills" data-section="skills">Skills</a>
+      <a class="nav-btn" href="#testimonials" data-section="testimonials">Testimonials</a>
+      <a class="nav-btn" href="#history" data-section="history">Changes</a>
+      <a class="nav-btn" href="#contact" data-section="contact">Contact</a>
     </div>
   </div>
 </div>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# Hero + About
-# -----------------------------
+# Active link highlighting + keyboard shortcuts + carousel JS
+components.html(f"""
+<script>
+(function() {{
+  const toc = document.getElementById('toc')?.querySelectorAll('a.nav-btn') || [];
+  const ids = Array.from(toc).map(a => a.dataset.section);
+  function markActive(id) {{
+    toc.forEach(a => a.setAttribute('aria-current', a.dataset.section===id ? 'page':'false'));
+  }}
+  const obs = new IntersectionObserver((entries)=>{
+    entries.forEach(e => {{ if(e.isIntersecting) markActive(e.target.id); }});
+  }, {{rootMargin: "-40% 0px -55% 0px", threshold: 0.01}});
+  ids.forEach(id => {{ const el = document.getElementById(id); if (el) obs.observe(el); }});
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === '/') {{
+      e.preventDefault();
+      const f = document.getElementById('project-search');
+      if(f) f.focus();
+    }}
+    if(e.key === 'g') {{
+      window.__gPress = Date.now();
+    }} else if (e.key === 'p' && window.__gPress && Date.now()-window.__gPress<600) {{
+      document.querySelector('a[href="#projects"]')?.click();
+    }}
+  }});
+
+  // Testimonials carousel
+  const track = document.getElementById('carousel-track');
+  if(track){{
+    let idx = 0; const total = track.children.length;
+    let paused = false;
+    track.addEventListener('mouseenter', ()=>paused=true);
+    track.addEventListener('mouseleave', ()=>paused=false);
+    function step() {{
+      if(!paused && !{str(reduce_motion).lower()}) {{
+        idx = (idx+1)%total;
+        track.style.transform = `translateX(${{-100*idx}}%)`;
+      }}
+      setTimeout(step, 2800);
+    }}
+    step();
+    document.getElementById('prev')?.addEventListener('click',()=>{{ idx=(idx-1+total)%total; track.style.transform = `translateX(${{-100*idx}}%)`; }});
+    document.getElementById('next')?.addEventListener('click',()=>{{ idx=(idx+1)%total; track.style.transform = `translateX(${{-100*idx}}%)`; }});
+  }}
+}})();
+</script>
+""", height=0)
+
+# =========================
+# Hero / Header
+# =========================
+st.markdown('<div id="top"></div>', unsafe_allow_html=True)
 st.markdown(f"""
-<div class="hero reveal section" id="about">
-  <h1>{PROFILE['name']}</h1>
-  <div class="sub">{PROFILE['role']}</div>
-  <div class="meta">📍 {PROFILE['location']}</div>
-  <div style="margin-top:12px;">
-    <a class="chip" href="tel:{PROFILE['phone']}" target="_blank">📞 {PROFILE['phone']}</a>
-    <a class="chip" href="mailto:{PROFILE['email']}" target="_blank">✉️ {PROFILE['email']}</a>
-    {"".join([f'<a class="chip" href="{url}" target="_blank">🔗 {name}</a>' for name, url in PROFILE["links"].items()])}
+<section class="hero section" id="about" aria-label="About section">
+  <h1>Dheer Doshi</h1>
+  <div class="muted" style="margin-bottom:6px;">Data Science · Product · Design</div>
+  <div class="grid" style="align-items:center;">
+    <div class="col-8">
+      <span class="badge">Open to work</span>
+      <span class="badge">Boston / Remote</span>
+      <span class="badge">Timezone-aware</span>
+      <div class="muted" style="margin-top:10px;">
+        Blending research rigor with product sense. Comfortable across ML pipelines, measurement,
+        and shipping UX that clarifies complexity.
+      </div>
+      <div style="margin-top:12px;">
+        <a class="badge" href="mailto:{CONTACT['email']}">✉ Email</a>
+        <a class="badge" href="{CONTACT['calendar']}" target="_blank">📅 Calendar</a>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="card" aria-label="Stats">
+        <div class="section-title">Stats</div>
+        <div>🗓️ <strong id="years">{STATS['years']}</strong> years experience</div>
+        <div>📦 <strong id="projects">{STATS['projects']}</strong> projects</div>
+        <div>📈 <strong id="impact">{STATS['impact_pct']}%</strong> measurable impact</div>
+      </div>
+    </div>
   </div>
-</div>
-<div class="reveal" style="margin-top:6px;"><div class="card">
-  <div class="section-title">About</div>
-  <div class="muted">Data science student blending research rigor with product sense. Comfortable across ML pipelines, deployment, and high-clarity communication. I enjoy building tools that make complex ideas usable for people.</div>
-</div></div>
+</section>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# Experience
-# -----------------------------
-st.markdown("<div id='experience' class='section'></div>", unsafe_allow_html=True)
-st.markdown("<div class='reveal card'><div class='section-title'>Experience</div></div>", unsafe_allow_html=True)
-for exp in EXPERIENCE:
+# =========================
+# Mode & Role content
+# =========================
+role_map = {r["label"]: r for r in ROLES}
+r = role_map[role_choice]
+bullets = r["tldr"] if mode else r["deep"]
+
+st.markdown("""
+<section class="section">
+  <div class="card">
+    <div class="section-title">Highlights</div>
+""", unsafe_allow_html=True)
+st.markdown("<ul>" + "".join([f"<li>{b}</li>" for b in bullets]) + "</ul>", unsafe_allow_html=True)
+st.markdown("</div></section>", unsafe_allow_html=True)
+
+# =========================
+# Experience (timeline)
+# =========================
+EXPERIENCE = [
+    {"company":"Ventura Securities","title":"Senior Research Intern","where":"Mumbai, India","from":"Dec 2024","to":"Present",
+     "items":["Equity & macro research for strategy","Investor-facing insights","Financial models for risk/opps"]},
+    {"company":"BU Projects","title":"Research Assistant","where":"Boston, MA","from":"Sep 2023","to":"Dec 2024",
+     "items":["Bio seq-modeling","Time-series forecasting","Rust SIR simulations"]},
+]
+st.markdown('<section class="section" id="experience" aria-label="Experience section">', unsafe_allow_html=True)
+st.markdown('<div class="card"><div class="section-title">Experience</div>', unsafe_allow_html=True)
+for e in EXPERIENCE:
     st.markdown(f"""
-    <div class="reveal card" style="margin-top:10px;">
-        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-            <div><strong>{exp['title']}</strong> — {exp['company']}</div>
-            <div class="muted">{exp['start']} – {exp['end']} • {exp['location']}</div>
-        </div>
-        <div style="margin:8px 0 4px 0;">{tag_badges(exp.get('tags'))}</div>
-        <ul style="margin:6px 0 0 18px;">
-          {''.join([f'<li>{b}</li>' for b in exp['bullets']])}
-        </ul>
-        <div style="margin-top:10px;">{"".join([f"<span class='kpi'>{k}</span>" for k in exp.get("kpis", [])])}</div>
+    <div tabindex="0" style="outline:none; margin-bottom:12px;">
+      <strong>{e['title']}</strong> — {e['company']} <span class="muted">({e['from']} – {e['to']}) • {e['where']}</span>
+      <ul>{"".join([f"<li>{x}</li>" for x in e["items"]])}</ul>
     </div>
     """, unsafe_allow_html=True)
+st.markdown("</div></section>", unsafe_allow_html=True)
 
-# -----------------------------
-# Education
-# -----------------------------
-st.markdown("<div id='education' class='section'></div>", unsafe_allow_html=True)
-st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Education</div>", unsafe_allow_html=True)
-for ed in EDUCATION:
-    st.markdown(f"""
-    <div class="muted"><strong>{ed['school']}</strong> — {ed['program']} • GPA: {ed['gpa']} • Graduation: {ed['grad']}</div>
-    <div style="height:6px;"></div>
-    <div><strong>Highlights:</strong></div>
-    <ul style="margin:6px 0 0 18px;">{''.join([f'<li>{h}</li>' for h in ed['highlights']])}</ul>
-    """, unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
+# =========================
+# Projects + Filters + Case-study
+# =========================
+qp = get_query_params()
+case_id = None
+if isinstance(qp, dict):
+    case_id = (qp.get("case") or qp.get("case_id") or [None])[0] if isinstance(qp.get("case"), list) or isinstance(qp.get("case_id"), list) else qp.get("case")
 
-# -----------------------------
-# Projects (search + tags)
-# -----------------------------
-st.markdown("<div id='projects' class='section'></div>", unsafe_allow_html=True)
-left, right = st.columns([2,1])  # removed vertical_alignment for compatibility
-with right:
-    all_tags = sorted({t for p in PROJECTS for t in p["tags"]})
-    sel = st.multiselect("🔎 Filter by tags", options=all_tags, placeholder="Select tags...")
-    q = st.text_input("Search projects", placeholder="Type to filter...").strip().lower()
+# Filters
+st.markdown('<section class="section" id="projects" aria-label="Projects section">', unsafe_allow_html=True)
+st.markdown('<div class="grid">', unsafe_allow_html=True)
+st.markdown('<div class="col-8">', unsafe_allow_html=True)
 
-with left:
-    st.markdown("<div class='reveal card'><div class='section-title'>Projects</div></div>", unsafe_allow_html=True)
-    visible = []
-    for p in PROJECTS:
-        if sel and not any(t in p["tags"] for t in sel):
-            continue
-        if q and q not in (p["name"] + " " + p["summary"]).lower():
-            continue
-        visible.append(p)
+if case_id:
+    # Case study page
+    proj = next((p for p in PROJECTS if p["id"] == case_id), None)
+    if proj:
+        st.markdown(f"<div class='card proj-card'><div class='section-title'>{proj['title']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='muted' style='margin-bottom:8px;'>{proj['summary']}</div>", unsafe_allow_html=True)
+        st.markdown("**Problem → Action → Result**")
+        for entry in proj["par"]:
+            st.markdown(f"- **{entry['type']}:** {entry['text']}")
+        st.markdown("**Metrics**")
+        st.markdown(" ".join([f"<span class='kpi'>{m['label']}: <strong>{m['value']}{m.get('unit','')}</strong></span>" for m in proj["metrics"]]), unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.link_button("← Back to all projects", "#projects", use_container_width=True)
+    else:
+        st.info("Case study not found.")
+else:
+    # Listing + filters
+    all_skills = sorted({t for p in PROJECTS for t in p["tags"].get("stack", [])})
+    all_industries = sorted({t for p in PROJECTS for t in p["tags"].get("industry", [])})
+    all_impacts = ["Low","Medium","High"]
+
+    # role-specific featured first
+    featured_ids = set(r["featured"])
+
+    st.text_input("Search", key="project-search", placeholder="Type to filter…")
+    f1 = st.multiselect("Filter by skill", options=all_skills)
+    f2 = st.multiselect("Filter by industry", options=all_industries)
+    f3 = st.multiselect("Filter by impact", options=all_impacts)
+
+    def passes(p):
+        if f1 and not set(f1).intersection(p["tags"].get("stack",[])): return False
+        if f2 and not set(f2).intersection(p["tags"].get("industry",[])): return False
+        if f3 and p["tags"].get("impact") not in f3: return False
+        q = st.session_state.get("project-search","").strip().lower()
+        if q and q not in (p["title"] + " " + p["summary"]).lower(): return False
+        # Mode/Role emphasis: in Scan mode, bias to featured
+        return True
+
+    # sort: featured → year desc
+    visible = [p for p in PROJECTS if passes(p)]
+    visible.sort(key=lambda p: (0 if p["id"] in featured_ids else 1, -int(p["tags"]["year"])))
 
     if not visible:
         st.info("No projects match your current filters.")
     for p in visible:
         st.markdown(f"""
-        <div class="reveal card" style="margin-top:10px;">
-            <div style="font-weight:700; font-size:1.05rem;">{p['name']}</div>
+        <div class="card proj-card">
+            <div class="section-title">{p['title']}</div>
             <div class="muted" style="margin:4px 0 8px 0;">{p['summary']}</div>
-            {tag_badges(p['tags'])}
+            {" ".join([f"<span class='badge'>{t}</span>" for t in p["tags"].get("stack",[])])}
+            {" ".join([f"<span class='badge'>{t}</span>" for t in p["tags"].get("industry",[])])}
+            <div style="margin-top:8px;">
+              <a class="badge" href="?case={p['id']}">Read case study</a>
+            </div>
         </div>
         """, unsafe_allow_html=True)
 
-# -----------------------------
-# Skills
-# -----------------------------
-st.markdown("<div id='skills' class='section'></div>", unsafe_allow_html=True)
-st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Skills Matrix</div>", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)  # col-8
 
-all_skills = [s for grp in SKILLS.values() for s in grp]
-if hasattr(st, "pills"):
-    selected = st.pills("Highlight", options=all_skills, selection_mode="multi")
-else:
-    selected = st.multiselect("Highlight", options=all_skills, placeholder="Pick skills to highlight")
+# Sidebar column with PDF + variant download
+st.markdown('<div class="col-4">', unsafe_allow_html=True)
+with st.container():
+    st.markdown("<div class='card'><div class='section-title'>Resume & Export</div>", unsafe_allow_html=True)
+    # Tailored variant name
+    variant = f"{role_choice} — {'Scan' if mode else 'Deep'}"
+    st.write(f"Current variant: **{variant}**")
+    # Download current variant (client-side print as PDF)
+    st.markdown("Use the **Print Dialog** (top-left sidebar) to save this variant as PDF with perfect print CSS.")
+    # Also provide base resume.pdf if present
+    pdf_path = Path(__file__).parent / "assets" / "resume.pdf"
+    if pdf_path.exists():
+        st.download_button("Download canonical PDF", data=pdf_path.read_bytes(), file_name="Resume.pdf", mime="application/pdf", use_container_width=True)
+    else:
+        st.info("Add your base PDF at `assets/resume.pdf` to enable direct download.")
+    st.markdown("</div>", unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)  # col-4
+st.markdown('</div></section>', unsafe_allow_html=True)  # grid + section
 
-c1, c2 = st.columns(2)
-groups = list(SKILLS.items())
-for i, (grp, items) in enumerate(groups):
-    with (c1 if i % 2 == 0 else c2):
-        st.markdown(f"<div class='section-title' style='margin-top:6px;'>{grp}</div>", unsafe_allow_html=True)
-        chips = []
+# =========================
+# Skills matrix (meters)
+# =========================
+st.markdown('<section class="section" id="skills" aria-label="Skills section">', unsafe_allow_html=True)
+st.markdown('<div class="card"><div class="section-title">Skills Matrix</div>', unsafe_allow_html=True)
+cols = st.columns(3)
+for i, (group, items) in enumerate(SKILLS.items()):
+    with cols[i]:
+        st.markdown(f"**{group}**")
         for s in items:
-            if selected and s in selected:
-                chips.append(f"<span class='badge' style='box-shadow:0 0 0 2px #bae6fd inset'>{s}</span>")
-            else:
-                chips.append(f"<span class='badge'>{s}</span>")
-        st.markdown(" ".join(chips), unsafe_allow_html=True)
+            lvl = max(1, min(5, SKILL_LEVEL.get(s, 3)))
+            pct = int(lvl/5*100)
+            st.markdown(f"{s}")
+            st.markdown(f"<div class='meter-wrap'><div class='meter-val' style='width:{pct}%;'></div></div>", unsafe_allow_html=True)
+st.markdown("</div></section>", unsafe_allow_html=True)
 
-st.markdown("""
-<hr/>
-<div class="muted"><strong>Languages:</strong> English • Hindi • Marathi • Gujarati • Spanish (Elementary)</div>
-<div class="muted" style="margin-top:4px;"><strong>Interests:</strong> Debate • History (Greek & Roman) • Soccer • Travel • Event Planning</div>
+# =========================
+# Testimonials / Logos carousel
+# =========================
+st.markdown('<section class="section" id="testimonials" aria-label="Testimonials section">', unsafe_allow_html=True)
+st.markdown('<div class="card"><div class="section-title">Testimonials</div>', unsafe_allow_html=True)
+st.markdown('<div class="carousel"><div class="carousel-track" id="carousel-track">', unsafe_allow_html=True)
+for t in TESTIMONIALS:
+    st.markdown(f"""
+    <div class="carousel-item">
+      <div style="font-size:1.1rem; font-weight:700;">“{t['quote']}”</div>
+      <div class="muted" style="margin-top:6px;">— {t['name']}, {t['role']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+st.markdown('</div><div class="carousel-controls"><button id="prev" aria-label="Previous">◀</button><button id="next" aria-label="Next">▶</button></div></div>', unsafe_allow_html=True)
+st.markdown('</div></section>', unsafe_allow_html=True)
+
+# =========================
+# Resume diff history
+# =========================
+st.markdown('<section class="section" id="history" aria-label="Changes section">', unsafe_allow_html=True)
+st.markdown('<div class="card"><div class="section-title">What changed since last month?</div>', unsafe_allow_html=True)
+for entry in RESUME_HISTORY:
+    with st.expander(entry["date"], expanded=False):
+        for c in entry["changes"]:
+            st.markdown(f"- {c}")
+st.markdown('</div></section>', unsafe_allow_html=True)
+
+# =========================
+# Contact (floating CTA too)
+# =========================
+st.markdown('<section class="section" id="contact" aria-label="Contact section">', unsafe_allow_html=True)
+st.markdown('<div class="card"><div class="section-title">Contact</div>', unsafe_allow_html=True)
+with st.form("contact_form"):
+    name = st.text_input("Your name")
+    email = st.text_input("Your email")
+    message = st.text_area("Message")
+    submit = st.form_submit_button("Draft Email")
+    if submit:
+        import urllib.parse as ul
+        subject = f"Hello from {name or 'a visitor'} — Resume Site"
+        body = f"From: {name}\\nEmail: {email}\\n\\n{message}"
+        href = f"mailto:{CONTACT['email']}?subject={ul.quote(subject)}&body={ul.quote(body)}"
+        st.markdown(f"[Open email draft]({href})")
+st.markdown('</div></section>', unsafe_allow_html=True)
+
+# Floating CTA
+st.markdown(f"""
+<div class="floating-cta" aria-label="Quick contact">
+  <a href="mailto:{CONTACT['email']}">Email</a>
+  <a href="{CONTACT['calendar']}" target="_blank">Calendar</a>
 </div>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# Leadership
-# -----------------------------
-st.markdown("<div id='leadership' class='section'></div>", unsafe_allow_html=True)
-st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Leadership & Engagement</div>", unsafe_allow_html=True)
-for item in LEADERSHIP:
-    with st.expander(item["role"], expanded=False):
-        st.write(item["impact"])
-st.markdown("</div>", unsafe_allow_html=True)
+# =========================
+# Print CSS (hide nav/CTAs/thumbs)
+# =========================
+st.markdown("""
+<style>
+@media print {
+  .navbar, .floating-cta, [data-testid="stSidebar"], .carousel-controls { display: none !important; }
+  .card { box-shadow: none !important; border-color: #000 !important; }
+  * { color: #000 !important; background: #fff !important; }
+  a[href^="http"]::after { content: " (" attr(href) ")"; font-size: .9em; }
+  @page { margin: 0.6in; }
+}
+</style>
+""", unsafe_allow_html=True)
 
-# -----------------------------
-# Resume (Download + Embed)
-# -----------------------------
-st.markdown("<div id='resume' class='section'></div>", unsafe_allow_html=True)
-st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Resume</div>", unsafe_allow_html=True)
-
-def download_button_from_file(file_path: Path, label: str):
-    try:
-        bytes_data = file_path.read_bytes()
-        st.download_button(label, data=bytes_data, file_name=file_path.name, mime="application/pdf", use_container_width=True)
-    except Exception:
-        st.info("Resume not bundled yet. Add your PDF to ./assets/resume.pdf")
-
-pdf_path = Path(__file__).parent / "assets" / "resume.pdf"
-st.write("Download a copy of my resume:")
-download_button_from_file(pdf_path, "📄 Download resume (PDF)")
-
-if pdf_path.exists():
-    base64_pdf = base64.b64encode(pdf_path.read_bytes()).decode("utf-8")
-    st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="900" type="application/pdf"></iframe>', unsafe_allow_html=True)
-else:
-    st.info("Embed will appear once resume.pdf is placed in assets.")
-
-st.markdown("</div>", unsafe_allow_html=True)
-
-# -----------------------------
-# Contact
-# -----------------------------
-st.markdown("<div id='contact' class='section'></div>", unsafe_allow_html=True)
-st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Contact</div>", unsafe_allow_html=True)
-with st.form("contact_form", clear_on_submit=False):
-    name = st.text_input("Your name")
-    sender = st.text_input("Your email")
-    message = st.text_area("Message")
-    submitted = st.form_submit_button("Draft Email")
-    if submitted:
-        subject = f"Hello from {name or 'a visitor'} — Interactive Resume"
-        body = f"From: {name}\nEmail: {sender}\n\n{message}"
-        st.markdown(f"[Open email draft]({mailto_link(PROFILE['email'], subject, body)})")
-st.markdown("</div>", unsafe_allow_html=True)
-
-# -----------------------------
+# =========================
 # Footer
-# -----------------------------
-st.caption("Made with 🤍 — Light theme, animations, smooth scroll, and interactive filters.")
+# =========================
+st.caption("Built for speed: keyboardable, high-contrast option, reduced-motion, and print-ready. Replace placeholders with your real content to go live.")
