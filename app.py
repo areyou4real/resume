@@ -530,11 +530,11 @@ with right:
     variant = f"{role_choice} — {'Scan' if mode else 'Deep'}"
     st.write(f"Current variant: **{variant}**")
     st.markdown("Use **Open Print Dialog (PDF)** in the sidebar to save this variant as a PDF (print CSS applied).")
-    pdf_path = Path(__file__).parent / "assets" / "resume.pdf"
+    pdf_path = Path(__file__).parent / "assets" / "Dheer Doshi Resume .pdf"
     if pdf_path.exists():
-        st.download_button("Download canonical PDF", data=pdf_path.read_bytes(), file_name="Resume.pdf", mime="application/pdf", use_container_width=True)
+        st.download_button("Download canonical PDF", data=pdf_path.read_bytes(), file_name="Dheer Doshi Resume .pdf", mime="application/pdf", use_container_width=True)
     else:
-        st.info("Add your base PDF at `assets/resume.pdf` to enable direct download.")
+        st.info("Add your base PDF at `assets/Dheer Doshi Resume .pdf` to enable direct download.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("</section>", unsafe_allow_html=True)
