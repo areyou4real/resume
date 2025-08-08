@@ -2,6 +2,9 @@ import streamlit as st
 from pathlib import Path
 import base64
 
+# -----------------------------
+# Page Config (Light-first)
+# -----------------------------
 st.set_page_config(
     page_title="Dheer Doshi — Interactive Resume",
     page_icon="💼",
@@ -9,102 +12,147 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-if "theme" not in st.session_state:
-    st.session_state.theme = "dark"
+# -----------------------------
+# Global CSS + Animations + Scroll UX
+# -----------------------------
+st.markdown("""
+<style>
+/* Light theme tokens */
+:root{
+  --bg:#ffffff;
+  --text:#0b1220;
+  --muted:#475569;
+  --card:#f7fafc;
+  --border:rgba(2,6,23,0.08);
+  --accent:#0ea5e9;
+  --accent-soft:#e0f2fe;
+  --chip-bg:#eef6ff;
+  --chip-br:#bfe0ff;
+}
 
-def inject_theme(theme: str):
-    if theme == "light":
-        bg = "#ffffff"
-        text = "#0f172a"
-        card = "#f1f5f9"
-        accent = "#0ea5e9"
-        mute = "#475569"
-    else:
-        bg = "#0b1020"
-        text = "#e2e8f0"
-        card = "#111836"
-        accent = "#22d3ee"
-        mute = "#94a3b8"
+/* Base */
+html, body, [class*="css"] {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
+  scroll-behavior:smooth;
+}
 
-    st.markdown(f"""
-        <style>
-            :root {{
-                --bg: {bg};
-                --text: {text};
-                --card: {card};
-                --accent: {accent};
-                --mute: {mute};
-            }}
-            html, body, [class*="css"] {{
-                background-color: var(--bg) !important;
-                color: var(--text) !important;
-                font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";
-            }}
-            .hero {{
-                padding: 28px 24px;
-                border-radius: 16px;
-                background: linear-gradient(145deg, var(--card), rgba(34,211,238,0.07));
-                border: 1px solid rgba(148,163,184,0.2);
-                box-shadow: 0 6px 24px rgba(0,0,0,0.25);
-            }}
-            .chip {{
-                display: inline-flex;
-                align-items: center;
-                gap: 8px;
-                padding: 6px 12px;
-                margin-right: 8px;
-                margin-bottom: 8px;
-                border-radius: 999px;
-                background: rgba(34,211,238,0.12);
-                border: 1px solid rgba(34,211,238,0.35);
-                color: var(--text);
-                font-size: 0.9rem;
-                text-decoration: none;
-            }}
-            .card {{
-                background: var(--card);
-                border-radius: 16px;
-                padding: 16px 18px;
-                border: 1px solid rgba(148,163,184,0.18);
-            }}
-            .muted {{
-                color: var(--mute);
-                font-size: 0.95rem;
-            }}
-            .kpi {{
-                display: inline-block;
-                padding: 8px 10px;
-                border-radius: 10px;
-                border: 1px dashed rgba(148,163,184,0.4);
-                margin-right: 10px;
-                margin-bottom: 10px;
-                font-size: 0.9rem;
-            }}
-            .badge {{
-                display:inline-block;
-                padding:4px 8px;
-                font-size:0.8rem;
-                border-radius:8px;
-                background:rgba(148,163,184,0.2);
-                margin-right:8px;
-                margin-bottom:8px;
-            }}
-            .section-title {{
-                font-size: 1.3rem;
-                font-weight: 700;
-                margin: 0 0 6px 0;
-            }}
-        </style>
-    """, unsafe_allow_html=True)
+/* Scroll progress bar */
+#scroll-progress {
+  position: fixed; top: 0; left: 0; height: 4px; width: 0%;
+  background: linear-gradient(90deg, #22c55e, #0ea5e9, #a855f7);
+  z-index: 10000; border-radius:0 4px 4px 0;
+}
 
-inject_theme(st.session_state.theme)
+/* Top Nav */
+.navbar {
+  position: sticky; top: 0; z-index: 9999;
+  backdrop-filter: saturate(1.2) blur(10px);
+  background: rgba(255,255,255,0.75);
+  border-bottom:1px solid var(--border);
+  padding: 10px 8px; border-radius: 0 0 12px 12px;
+}
+.nav-grid { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; }
+.nav-links { display:flex; gap:10px; flex-wrap:wrap; }
+.nav-btn {
+  border:1px solid var(--border); background:#fff; color:var(--text);
+  padding:8px 12px; border-radius:10px; font-weight:600; text-decoration:none; transition: all .2s ease;
+}
+.nav-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(2,6,23,0.08); border-color:#bae6fd; }
 
-with st.sidebar:
-    st.write("🎨 **Theme**")
-    mode = st.toggle("Light mode", value=(st.session_state.theme == "light"))
-    st.session_state.theme = "light" if mode else "dark"
-    inject_theme(st.session_state.theme)
+/* Hero */
+.hero {
+  padding: 28px 24px; margin: 8px 0 16px 0;
+  border-radius: 20px; position: relative; overflow:hidden;
+  background: radial-gradient(1200px 600px at 5% -10%, #e7f7ff 0%, transparent 50%), 
+              radial-gradient(900px 500px at 95% 10%, #f6e8ff 0%, transparent 55%),
+              var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(2,6,23,0.06);
+  animation: floatIn .6s ease-out both;
+}
+@keyframes floatIn { from {opacity:0; transform: translateY(10px)} to {opacity:1; transform: translateY(0)} }
 
+.hero h1 { font-size:2.15rem; margin:0 0 6px 0; line-height:1.1; }
+.hero .sub { color: var(--muted); margin-bottom:10px; }
+.hero .meta { color: var(--muted); }
+
+/* Chips */
+.chip {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 12px; margin:6px 6px 0 0; border-radius:999px;
+  background: var(--chip-bg); border:1px solid var(--chip-br);
+  font-size:0.92rem; text-decoration:none; color:var(--text);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.chip:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(2,6,23,0.08); }
+
+/* Cards */
+.card {
+  background:#fff; border:1px solid var(--border); border-radius:18px;
+  padding:16px 18px; box-shadow: 0 10px 24px rgba(2,6,23,0.05);
+}
+.section-title { font-weight:800; font-size:1.1rem; letter-spacing:.2px; margin:0 0 8px 0; }
+.muted { color: var(--muted); }
+
+/* Badges / KPIs */
+.badge {
+  display:inline-block; padding:5px 10px; border-radius:999px;
+  background: var(--accent-soft); color:#075985; font-weight:600; font-size:.82rem;
+  margin:0 8px 8px 0; border:1px solid #bae6fd;
+}
+.kpi { display:inline-block; padding:6px 10px; border-radius:10px; border:1px dashed #cbd5e1; margin:0 10px 10px 0; }
+
+/* Reveal on scroll */
+.reveal { opacity:0; transform: translateY(12px); transition: all .6s ease; }
+.reveal.visible { opacity:1; transform: translateY(0); }
+
+/* Floating Back-To-Top */
+#backToTop {
+  position: fixed; right: 18px; bottom: 24px; z-index: 9999;
+  border: none; background: #111827; color: #fff; border-radius: 999px;
+  padding: 12px 14px; cursor: pointer; box-shadow: 0 8px 24px rgba(17,24,39,.25);
+  display:none; transition: transform .2s ease, opacity .2s ease;
+}
+#backToTop:hover { transform: translateY(-2px); }
+
+/* Section anchor spacing */
+.section { scroll-margin-top: 90px; }
+hr { border:none; border-top:1px solid var(--border); margin: 8px 0 16px 0; }
+</style>
+
+<div id="scroll-progress"></div>
+<script>
+(function(){
+  const progress = document.getElementById('scroll-progress');
+  const backBtn = document.createElement('button');
+  backBtn.id = 'backToTop';
+  backBtn.innerText = '↑';
+  document.body.appendChild(backBtn);
+
+  function onScroll(){
+    const h = document.documentElement;
+    const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+    progress.style.width = scrolled + '%';
+    backBtn.style.display = h.scrollTop > 300 ? 'block' : 'none';
+  }
+  window.addEventListener('scroll', onScroll, {passive:true});
+  backBtn.addEventListener('click', () => window.scrollTo({top:0, behavior:'smooth'}));
+
+  // Reveal on scroll
+  const obs = new IntersectionObserver((entries)=>{
+    entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, {threshold: 0.08});
+  setTimeout(()=>{ document.querySelectorAll('.reveal').forEach(el=>obs.observe(el)); }, 100);
+
+})();
+</script>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# Data (edit to personalize)
+# -----------------------------
 PROFILE = {
     "name": "Dheer Doshi",
     "role": "Data Science @ Boston University • Research & Product-minded",
@@ -158,6 +206,13 @@ PROJECTS = [
     {"name": "Vision Web App", "summary": "Real-time image classification with TensorFlow + Streamlit; Dockerized.", "tags": ["TensorFlow", "Streamlit", "Docker", "MLOps"]},
 ]
 
+SKILLS = {
+    "Core": ["Python", "PyTorch", "TensorFlow", "Rust", "R", "SQL", "GitHub", "Docker"],
+    "Data & Cloud": ["Tableau", "AWS", "Firebase", "MongoDB"],
+    "Apps & Video": ["Streamlit", "HTML5", "JavaScript", "OBS Studio", "Adobe Suite", "Final Cut Pro"],
+    "Other": ["CPR Certified"]
+}
+
 LEADERSHIP = [
     {"role": "Director, Oxford MUN", "impact": "Led 2,000+ delegate sessions; digital briefing innovations."},
     {"role": "Director, TEDx Singhania", "impact": "Exceeded sponsorship targets; record virtual attendance."},
@@ -166,15 +221,19 @@ LEADERSHIP = [
     {"role": "PIT-UN Volunteer", "impact": "Orchestrated logistics enabling cross-sector collaboration."},
 ]
 
-SKILLS = {
-    "Core": ["Python", "PyTorch", "TensorFlow", "Rust", "R", "SQL", "GitHub", "Docker"],
-    "Data & Cloud": ["Tableau", "AWS", "Firebase", "MongoDB"],
-    "Apps & Video": ["Streamlit", "HTML5", "JavaScript", "OBS Studio", "Adobe Suite", "Final Cut Pro"],
-    "Other": ["CPR Certified"]
-}
-
 LANGUAGES = ["English", "Hindi", "Marathi", "Gujarati", "Spanish (Elementary)"]
 INTERESTS = ["Debate", "History (Greek & Roman)", "Soccer", "Travel", "Event Planning"]
+
+# -----------------------------
+# Helpers
+# -----------------------------
+def tag_badges(tags):
+    if not tags: return ""
+    return " ".join([f"<span class='badge'>{t}</span>" for t in tags])
+
+def mailto_link(to, subject, body):
+    import urllib.parse as ul
+    return f"mailto:{to}?subject={ul.quote(subject)}&body={ul.quote(body)}"
 
 def download_button_from_file(file_path: Path, label: str):
     try:
@@ -183,144 +242,192 @@ def download_button_from_file(file_path: Path, label: str):
     except Exception:
         st.info("Resume not bundled yet. Add your PDF to ./assets/resume.pdf")
 
-def mailto_link(to, subject, body):
-    import urllib.parse as ul
-    href = f"mailto:{to}?subject={ul.quote(subject)}&body={ul.quote(body)}"
-    return href
-
-def tag_badges(tags):
-    if not tags: return ""
-    return " ".join([f"<span class='badge'>{t}</span>" for t in tags])
-
-st.markdown(
-    f"""
-    <div class="hero">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
-            <div style="flex:1 1 520px">
-                <div style="font-size:2.1rem;font-weight:800;margin-bottom:6px;">{PROFILE['name']}</div>
-                <div class="muted" style="margin-bottom:12px;">{PROFILE['role']}</div>
-                <div class="muted">📍 {PROFILE['location']}</div>
-            </div>
-            <div style="flex:0 0 auto;min-width:320px;">
-                <a class="chip" href="tel:{PROFILE['phone']}" target="_blank">📞 {PROFILE['phone']}</a>
-                <a class="chip" href="mailto:{PROFILE['email']}" target="_blank">✉️ {PROFILE['email']}</a>
-                {"".join([f'<a class="chip" href="{url}" target="_blank">🔗 {name}</a>' for name, url in PROFILE["links"].items()])}
-            </div>
-        </div>
+# -----------------------------
+# Sticky Top Nav
+# -----------------------------
+st.markdown("""
+<div class="navbar">
+  <div class="nav-grid">
+    <div><strong>💼 Dheer Doshi</strong></div>
+    <div class="nav-links">
+      <a class="nav-btn" href="#about">About</a>
+      <a class="nav-btn" href="#experience">Experience</a>
+      <a class="nav-btn" href="#education">Education</a>
+      <a class="nav-btn" href="#projects">Projects</a>
+      <a class="nav-btn" href="#skills">Skills</a>
+      <a class="nav-btn" href="#leadership">Leadership</a>
+      <a class="nav-btn" href="#resume">Resume</a>
+      <a class="nav-btn" href="#contact">Contact</a>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-st.markdown(" ")
+# -----------------------------
+# Hero
+# -----------------------------
+st.markdown(f"""
+<div class="hero reveal" id="about">
+  <h1>{PROFILE['name']}</h1>
+  <div class="sub">{PROFILE['role']}</div>
+  <div class="meta">📍 {PROFILE['location']}</div>
+  <div style="margin-top:12px;">
+    <a class="chip" href="tel:{PROFILE['phone']}" target="_blank">📞 {PROFILE['phone']}</a>
+    <a class="chip" href="mailto:{PROFILE['email']}" target="_blank">✉️ {PROFILE['email']}</a>
+    {"".join([f'<a class="chip" href="{url}" target="_blank">🔗 {name}</a>' for name, url in PROFILE["links"].items()])}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
-tab_about, tab_exp, tab_edu, tab_projects, tab_skills, tab_lead, tab_resume, tab_contact = st.tabs([
-    "About", "Experience", "Education", "Projects", "Skills", "Leadership", "Resume", "Contact"
-])
+st.markdown("""<div class="reveal" style="margin-top:6px;"><div class="card">
+  <div class="section-title">About</div>
+  <div class="muted">Data science student blending research rigor with product sense. Comfortable across ML pipelines, deployment, and high-clarity communication. I enjoy building tools that make complex ideas usable for people.</div>
+</div></div>""", unsafe_allow_html=True)
 
-with tab_about:
-    st.subheader("About")
-    st.write(
-        "Data science student blending research rigor with product sense. "
-        "Comfortable across ML pipelines, deployment, and high-clarity communication."
-    )
-    st.write("I enjoy building tools that make complex ideas usable for people.")
+# -----------------------------
+# Experience
+# -----------------------------
+st.markdown("<div id='experience' class='section'></div>", unsafe_allow_html=True)
+st.markdown("<div class='reveal'><div class='card'><div class='section-title'>Experience</div></div></div>", unsafe_allow_html=True)
+for exp in EXPERIENCE:
+    with st.container():
+        st.markdown(f"""
+        <div class="reveal card" style="margin-top:10px;">
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                <div><strong>{exp['title']}</strong> — {exp['company']}</div>
+                <div class="muted">{exp['start']} – {exp['end']} • {exp['location']}</div>
+            </div>
+            <div style="margin:8px 0 4px 0;">{tag_badges(exp.get('tags'))}</div>
+            <ul style="margin:6px 0 0 18px;">
+              {''.join([f'<li>{b}</li>' for b in exp['bullets']])}
+            </ul>
+            <div style="margin-top:10px;">{"".join([f"<span class='kpi'>{k}</span>" for k in exp.get("kpis", [])])}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-with tab_exp:
-    st.subheader("Experience")
-    for exp in EXPERIENCE:
-        with st.expander(f"**{exp['title']}** — {exp['company']} ({exp['start']} – {exp['end']}) — {exp['location']}", expanded=False):
-            st.markdown(tag_badges(exp.get("tags")), unsafe_allow_html=True)
-            for b in exp["bullets"]:
-                st.markdown(f"- {b}")
-            if exp.get("kpis"):
-                st.markdown("**Focus areas:**")
-                st.markdown("".join([f"<span class='kpi'>{k}</span>" for k in exp["kpis"]]), unsafe_allow_html=True)
+# -----------------------------
+# Education
+# -----------------------------
+st.markdown("<div id='education' class='section'></div>", unsafe_allow_html=True)
+st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Education</div>", unsafe_allow_html=True)
+for ed in EDUCATION:
+    st.markdown(f"""
+    <div class="muted"><strong>{ed['school']}</strong> — {ed['program']} • GPA: {ed['gpa']} • Graduation: {ed['grad']}</div>
+    <div style="height:6px;"></div>
+    <div><strong>Highlights:</strong></div>
+    <ul style="margin:6px 0 0 18px;">{''.join([f'<li>{h}</li>' for h in ed['highlights']])}</ul>
+    """, unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
-with tab_edu:
-    st.subheader("Education")
-    for ed in EDUCATION:
-        st.markdown(f"**{ed['school']}** — {ed['program']}  •  GPA: {ed['gpa']}  •  Graduation: {ed['grad']}")
-        st.markdown("**Highlights:**")
-        for h in ed["highlights"]:
-            st.markdown(f"- {h}")
+# -----------------------------
+# Projects (search + tags)
+# -----------------------------
+st.markdown("<div id='projects' class='section'></div>", unsafe_allow_html=True)
+left, right = st.columns([2,1], vertical_alignment="top")
+with right:
+    all_tags = sorted({t for p in PROJECTS for t in p["tags"]})
+    sel = st.multiselect("🔎 Filter by tags", options=all_tags, placeholder="Select tags...")
+    q = st.text_input("Search projects", placeholder="Type to filter...").strip().lower()
 
-with tab_projects:
-    left, right = st.columns([2,1])
-    with right:
-        all_tags = sorted({t for p in PROJECTS for t in p["tags"]})
-        sel = st.multiselect("Filter by tags", options=all_tags, default=[])
-        q = st.text_input("Search", placeholder="Search projects...").strip().lower()
-    with left:
-        visible = []
-        for p in PROJECTS:
-            if sel and not any(t in p["tags"] for t in sel):
-                continue
-            if q and q not in (p["name"] + " " + p["summary"]).lower():
-                continue
-            visible.append(p)
-        if not visible:
-            st.info("No projects match your current filters.")
-        for p in visible:
-            with st.container():
-                st.markdown(f"### {p['name']}")
-                st.markdown(p["summary"])
-                st.markdown(tag_badges(p["tags"]), unsafe_allow_html=True)
-                st.divider()
+with left:
+    st.markdown("<div class='reveal card'><div class='section-title'>Projects</div></div>", unsafe_allow_html=True)
+    visible = []
+    for p in PROJECTS:
+        if sel and not any(t in p["tags"] for t in sel):
+            continue
+        if q and q not in (p["name"] + " " + p["summary"]).lower():
+            continue
+        visible.append(p)
 
-with tab_skills:
-    st.subheader("Skills Matrix")
-    # If your Streamlit version supports st.pills, this provides a nice multi-select UI.
-    # Otherwise, you can replace with st.multiselect.
-    selected = st.pills("Highlight", options=[s for grp in SKILLS.values() for s in grp], selection_mode="multi") if hasattr(st, "pills") else st.multiselect("Highlight", [s for grp in SKILLS.values() for s in grp])
-    cols = st.columns(2)
-    groups = list(SKILLS.items())
-    for i, (grp, items) in enumerate(groups):
-        with cols[i % 2]:
-            st.markdown(f"<div class='section-title'>{grp}</div>", unsafe_allow_html=True)
-            line = []
-            for s in items:
-                if selected and s in selected:
-                    line.append(f"<span class='badge' style='border:1px solid var(--accent);background:rgba(34,211,238,0.18)'>{s}</span>")
-                else:
-                    line.append(f"<span class='badge'>{s}</span>")
-            st.markdown(" ".join(line), unsafe_allow_html=True)
-    st.markdown(" ")
-    st.markdown("**Languages**")
-    st.markdown(" ".join([f"<span class='badge'>{l}</span>" for l in LANGUAGES]), unsafe_allow_html=True)
-    st.markdown("**Interests**")
-    st.markdown(" ".join([f"<span class='badge'>{i}</span>" for i in INTERESTS]), unsafe_allow_html=True)
+    if not visible:
+        st.info("No projects match your current filters.")
+    for p in visible:
+        st.markdown(f"""
+        <div class="reveal card" style="margin-top:10px;">
+            <div style="font-weight:700; font-size:1.05rem;">{p['name']}</div>
+            <div class="muted" style="margin:4px 0 8px 0;">{p['summary']}</div>
+            {tag_badges(p['tags'])}
+        </div>
+        """, unsafe_allow_html=True)
 
-with tab_lead:
-    st.subheader("Leadership & Engagement")
-    for item in LEADERSHIP:
-        with st.expander(item["role"], expanded=False):
-            st.write(item["impact"])
+# -----------------------------
+# Skills
+# -----------------------------
+st.markdown("<div id='skills' class='section'></div>", unsafe_allow_html=True)
+st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Skills Matrix</div>", unsafe_allow_html=True)
 
-with tab_resume:
-    st.subheader("Resume")
-    pdf_path = Path(__file__).parent / "assets" / "resume.pdf"
-    st.write("Download a copy of my resume:")
-    download_button_from_file(pdf_path, "📄 Download resume (PDF)")
-    if pdf_path.exists():
-        base64_pdf = base64.b64encode(pdf_path.read_bytes()).decode("utf-8")
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="900" type="application/pdf"></iframe>'
-        st.markdown(pdf_display, unsafe_allow_html=True)
-    else:
-        st.info("Embed will appear once resume.pdf is placed in assets.")
+# Try st.pills if available; fallback to multiselect
+all_skills = [s for grp in SKILLS.values() for s in grp]
+if hasattr(st, "pills"):
+    selected = st.pills("Highlight", options=all_skills, selection_mode="multi")
+else:
+    selected = st.multiselect("Highlight", options=all_skills, placeholder="Pick skills to highlight")
 
-with tab_contact:
-    st.subheader("Contact")
-    with st.form("contact_form", clear_on_submit=False):
-        name = st.text_input("Your name")
-        sender = st.text_input("Your email")
-        message = st.text_area("Message")
-        submitted = st.form_submit_button("Draft Email")
-        if submitted:
-            subject = f"Hello from {name or 'a visitor'} — Interactive Resume"
-            body = f"From: {name}\nEmail: {sender}\n\n{message}"
-            import urllib.parse as ul
-            href = f"mailto:{PROFILE['email']}?subject={ul.quote(subject)}&body={ul.quote(body)}"
-            st.markdown(f"[Open email draft]({href})")
+c1, c2 = st.columns(2)
+groups = list(SKILLS.items())
+for i, (grp, items) in enumerate(groups):
+    with (c1 if i % 2 == 0 else c2):
+        st.markdown(f"<div class='section-title' style='margin-top:6px;'>{grp}</div>", unsafe_allow_html=True)
+        figs = []
+        for s in items:
+            if selected and s in selected:
+                figs.append(f"<span class='badge' style='box-shadow:0 0 0 2px #bae6fd inset'>{s}</span>")
+            else:
+                figs.append(f"<span class='badge'>{s}</span>")
+        st.markdown(" ".join(figs), unsafe_allow_html=True)
 
-st.caption("Built with ❤️ in Streamlit")
+st.markdown("""
+<hr/>
+<div class="muted"><strong>Languages:</strong> English • Hindi • Marathi • Gujarati • Spanish (Elementary)</div>
+<div class="muted" style="margin-top:4px;"><strong>Interests:</strong> Debate • History (Greek & Roman) • Soccer • Travel • Event Planning</div>
+</div>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# Leadership
+# -----------------------------
+st.markdown("<div id='leadership' class='section'></div>", unsafe_allow_html=True)
+st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Leadership & Engagement</div>", unsafe_allow_html=True)
+for item in LEADERSHIP:
+    with st.expander(item["role"], expanded=False):
+        st.write(item["impact"])
+st.markdown("</div>", unsafe_allow_html=True)
+
+# -----------------------------
+# Resume (Download + Embed)
+# -----------------------------
+st.markdown("<div id='resume' class='section'></div>", unsafe_allow_html=True)
+st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Resume</div>", unsafe_allow_html=True)
+
+pdf_path = Path(__file__).parent / "assets" / "resume.pdf"
+st.write("Download a copy of my resume:")
+download_button_from_file(pdf_path, "📄 Download resume (PDF)")
+
+if pdf_path.exists():
+    base64_pdf = base64.b64encode(pdf_path.read_bytes()).decode("utf-8")
+    st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="900" type="application/pdf"></iframe>', unsafe_allow_html=True)
+else:
+    st.info("Embed will appear once resume.pdf is placed in assets.")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# -----------------------------
+# Contact
+# -----------------------------
+st.markdown("<div id='contact' class='section'></div>", unsafe_allow_html=True)
+st.markdown("<div class='reveal card' style='margin-top:14px;'><div class='section-title'>Contact</div>", unsafe_allow_html=True)
+with st.form("contact_form", clear_on_submit=False):
+    name = st.text_input("Your name")
+    sender = st.text_input("Your email")
+    message = st.text_area("Message")
+    submitted = st.form_submit_button("Draft Email")
+    if submitted:
+        subject = f"Hello from {name or 'a visitor'} — Interactive Resume"
+        body = f"From: {name}\nEmail: {sender}\n\n{message}"
+        st.markdown(f"[Open email draft]({mailto_link(PROFILE['email'], subject, body)})")
+st.markdown("</div>", unsafe_allow_html=True)
+
+# -----------------------------
+# Footer
+# -----------------------------
+st.caption("Made with 🤍 — Light theme, animations, smooth scroll, and interactive filters.")
