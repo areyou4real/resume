@@ -1,18 +1,3 @@
-# Fix and rewrite app.py with correct string quoting
-import os, shutil, textwrap, base64
-from pathlib import Path
-
-base_dir = "/mnt/data/interactive_resume_streamlit"
-assets_dir = os.path.join(base_dir, "assets")
-os.makedirs(assets_dir, exist_ok=True)
-
-# Copy resume again just in case
-src_pdf = "/mnt/data/Dheer Doshi Resume .pdf"
-dest_pdf = os.path.join(assets_dir, "resume.pdf")
-if os.path.exists(src_pdf):
-    shutil.copy(src_pdf, dest_pdf)
-
-app_py = """
 import streamlit as st
 from pathlib import Path
 import base64
@@ -41,7 +26,7 @@ def inject_theme(theme: str):
         accent = "#22d3ee"
         mute = "#94a3b8"
 
-    st.markdown(f\"""
+    st.markdown(f"""
         <style>
             :root {{
                 --bg: {bg};
@@ -110,7 +95,7 @@ def inject_theme(theme: str):
                 margin: 0 0 6px 0;
             }}
         </style>
-    \""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
 inject_theme(st.session_state.theme)
 
@@ -208,7 +193,7 @@ def tag_badges(tags):
     return " ".join([f"<span class='badge'>{t}</span>" for t in tags])
 
 st.markdown(
-    f\"""
+    f"""
     <div class="hero">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
             <div style="flex:1 1 520px">
@@ -223,7 +208,7 @@ st.markdown(
             </div>
         </div>
     </div>
-    \""",
+    """,
     unsafe_allow_html=True
 )
 
@@ -285,7 +270,9 @@ with tab_projects:
 
 with tab_skills:
     st.subheader("Skills Matrix")
-    selected = st.pills("Highlight", options=[s for grp in SKILLS.values() for s in grp], selection_mode="multi")
+    # If your Streamlit version supports st.pills, this provides a nice multi-select UI.
+    # Otherwise, you can replace with st.multiselect.
+    selected = st.pills("Highlight", options=[s for grp in SKILLS.values() for s in grp], selection_mode="multi") if hasattr(st, "pills") else st.multiselect("Highlight", [s for grp in SKILLS.values() for s in grp])
     cols = st.columns(2)
     groups = list(SKILLS.items())
     for i, (grp, items) in enumerate(groups):
@@ -331,18 +318,9 @@ with tab_contact:
         submitted = st.form_submit_button("Draft Email")
         if submitted:
             subject = f"Hello from {name or 'a visitor'} — Interactive Resume"
-            body = f"From: {name}\\nEmail: {sender}\\n\\n{message}"
-            href = mailto_link(PROFILE["email"], subject, body)
+            body = f"From: {name}\nEmail: {sender}\n\n{message}"
+            import urllib.parse as ul
+            href = f"mailto:{PROFILE['email']}?subject={ul.quote(subject)}&body={ul.quote(body)}"
             st.markdown(f"[Open email draft]({href})")
 
 st.caption("Built with ❤️ in Streamlit")
-"""
-
-with open(os.path.join(base_dir, "app.py"), "w") as f:
-    f.write(app_py)
-
-# Re-write requirements.txt (already exists; ensure content present)
-with open(os.path.join(base_dir, "requirements.txt"), "w") as f:
-    f.write("streamlit>=1.36.0\npillow>=10.0.0\n")
-
-list(Path(base_dir).rglob("*"))
